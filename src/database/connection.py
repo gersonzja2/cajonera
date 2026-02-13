@@ -4,10 +4,6 @@ import bcrypt
 from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, ForeignKey, Float
 from sqlalchemy.orm import sessionmaker, declarative_base
-from dotenv import load_dotenv
-
-# Cargar variables de entorno
-load_dotenv()
 
 # --- Configuración de Rutas (User Data) ---
 # Usamos la carpeta de Documentos del usuario para garantizar permisos de escritura
@@ -21,7 +17,10 @@ for d in [USER_DIR, DATA_DIR, BACKUP_DIR, PDF_DIR]:
         os.makedirs(d)
 
 # Configuración de la Base de Datos
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(DATA_DIR, 'cajonera.db')}")
+# Aseguramos que la ruta absoluta use barras normales para evitar problemas con SQLAlchemy en Windows
+db_path_abs = os.path.join(DATA_DIR, 'cajonera.db')
+# Forzamos el uso de la ruta en Documentos para evitar que .env o rutas relativas desvíen el archivo
+DATABASE_URL = f"sqlite:///{db_path_abs.replace(os.sep, '/')}"
 
 Base = declarative_base()
 engine = create_engine(DATABASE_URL, echo=False)
@@ -99,6 +98,19 @@ class AuditLog(Base):
 
 def init_db():
     """Inicializa la base de datos y crea las tablas."""
+    # --- MIGRACIÓN AUTOMÁTICA ---
+    # Si existe una base de datos antigua en la carpeta del proyecto, la copiamos a Documentos
+    local_db = os.path.join(os.getcwd(), "data", "cajonera.db")
+    target_db = os.path.join(DATA_DIR, "cajonera.db")
+    
+    if os.path.exists(local_db) and not os.path.exists(target_db):
+        print(f"Detectada base de datos local. Migrando a: {target_db}")
+        try:
+            shutil.copy2(local_db, target_db)
+            print("Migración completada exitosamente.")
+        except Exception as e:
+            print(f"Error al migrar base de datos: {e}")
+
     Base.metadata.create_all(engine)
     
     session = SessionLocal()
@@ -109,18 +121,33 @@ def init_db():
         admin_user = Usuario(username="admin", password_hash=hashed.decode('utf-8'), role="admin")
         session.add(admin_user)
         session.commit()
+    
+    # Detectar ruta real usada por SQLAlchemy
+    db_path = engine.url.database
+    if db_path and not os.path.isabs(db_path):
+        db_path = os.path.abspath(db_path)
+
+    print(f"Base de datos conectada en: {db_path}")
+    if db_path and not os.path.exists(db_path):
+        print("ADVERTENCIA: El archivo de base de datos no aparece en disco. Verifique permisos o ruta.")
     session.close()
 
 def backup_db():
     """Crea una copia de seguridad de la base de datos al cerrar."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # Extraer ruta del archivo DB actual desde la URL
-    if DATABASE_URL.startswith("sqlite:///"):
-        db_path = DATABASE_URL.replace("sqlite:///", "")
-    else:
-        db_path = os.path.join(DATA_DIR, "cajonera.db")
+    # Usamos la ruta real del engine para asegurar que copiamos el archivo correcto
+    db_path = engine.url.database
+    if db_path and not os.path.isabs(db_path):
+        db_path = os.path.abspath(db_path)
 
-    if os.path.exists(db_path):
-        backup_path = os.path.join(BACKUP_DIR, f"cajonera_backup_{timestamp}.db")
-        shutil.copy2(db_path, backup_path)
+    if db_path and os.path.exists(db_path):
+        try:
+            backup_path = os.path.join(BACKUP_DIR, f"cajonera_backup_{timestamp}.db")
+            shutil.copy2(db_path, backup_path)
+            print(f"\n[BACKUP] Copia guardada exitosamente.")
+            print(f" -> Ubicación: {backup_path}")
+        except Exception as e:
+            print(f"\n[BACKUP ERROR] No se pudo crear la copia: {e}")
+    else:
+        print(f"\n[BACKUP ERROR] No se encontró la base de datos en: {db_path}")

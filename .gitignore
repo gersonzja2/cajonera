@@ -22,3 +22,8 @@ Thumbs.db
 *.log
 *.sqlite
 *.db
+
+# Carpetas de datos locales (ahora se guardan en Documentos)
+data/
+backups/
+pdf/

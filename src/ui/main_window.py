@@ -28,6 +28,24 @@ class MainWindow:
         self.actualizar_display()
 
     def setup_ui(self):
+        # --- ELEMENTOS INFERIORES (Pack primero para que queden fijos abajo) ---
+        btn_logout = tk.Button(self.root, text="Cerrar Sesión", command=self.on_logout)
+        btn_logout.pack(side=tk.BOTTOM, pady=10)
+
+        # Totales y Confirmación (Encima del logout)
+        frame_total = tk.Frame(self.root)
+        frame_total.pack(side=tk.BOTTOM, fill="x", padx=10, pady=5)
+
+        self.label_total = tk.Label(frame_total, text="Total a Pagar: $0.00", font=("Arial", 14, "bold"), fg="blue")
+        self.label_total.pack(side=tk.LEFT, padx=10)
+
+        btn_confirmar = tk.Button(frame_total, text="Confirmar Venta ✅", bg="#d4edda", font=("Arial", 11, "bold"), command=self.confirmar_venta)
+        btn_confirmar.pack(side=tk.RIGHT, padx=5)
+
+        btn_limpiar = tk.Button(frame_total, text="Limpiar 🗑️", bg="#f8d7da", command=self.limpiar_carrito)
+        btn_limpiar.pack(side=tk.RIGHT, padx=5)
+
+        # --- ELEMENTOS SUPERIORES ---
         # Título
         self.label_titulo = tk.Label(self.root, text="Control de Stock", font=("Arial", 18, "bold"))
         self.label_titulo.pack(pady=20)
@@ -116,22 +134,6 @@ class MainWindow:
         scrollbar = ttk.Scrollbar(frame_carrito, orient="vertical", command=self.tree_carrito.yview)
         scrollbar.pack(side=tk.RIGHT, fill="y")
         self.tree_carrito.configure(yscrollcommand=scrollbar.set)
-
-        # Totales y Confirmación
-        frame_total = tk.Frame(self.root)
-        frame_total.pack(fill="x", padx=10, pady=5)
-
-        self.label_total = tk.Label(frame_total, text="Total a Pagar: $0.00", font=("Arial", 14, "bold"), fg="blue")
-        self.label_total.pack(side=tk.LEFT, padx=10)
-
-        btn_confirmar = tk.Button(frame_total, text="Confirmar Venta ✅", bg="#d4edda", font=("Arial", 11, "bold"), command=self.confirmar_venta)
-        btn_confirmar.pack(side=tk.RIGHT, padx=5)
-
-        btn_limpiar = tk.Button(frame_total, text="Limpiar 🗑️", bg="#f8d7da", command=self.limpiar_carrito)
-        btn_limpiar.pack(side=tk.RIGHT, padx=5)
-        
-        btn_logout = tk.Button(self.root, text="Cerrar Sesión", command=self.on_logout)
-        btn_logout.pack(side=tk.BOTTOM, pady=10)
 
     def actualizar_lista_productos(self):
         productos = self.logic.obtener_productos()

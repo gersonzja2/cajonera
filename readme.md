@@ -45,7 +45,7 @@ Sistema de gestión de inventario y punto de venta (POS) desarrollado en Python.
    ```bash
    pip install -r requirements.txt
    ```
-   *Asegúrate de que `requirements.txt` incluya: `sqlalchemy`, `python-dotenv`, `bcrypt`, `reportlab`.*
+   *Asegúrate de que `requirements.txt` incluya: `sqlalchemy`, `bcrypt`, `reportlab`.*
 
 4. **Primer Inicio**:
    Al ejecutar la aplicación por primera vez, se creará automáticamente la carpeta `Cajonera` en tus Documentos con la base de datos inicializada.

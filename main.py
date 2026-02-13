@@ -12,6 +12,7 @@ class AppController:
 
     def show_login(self):
         if self.main_frame:
+            backup_db() # Realizar backup al cerrar sesión
             self.main_frame.destroy()
             self.main_frame = None
         self.root.withdraw()
@@ -32,7 +33,7 @@ def main():
     root = tk.Tk()
     root.title("Sistema de Inventario")
     root.geometry("900x500") # Un poco más ancho para los nuevos botones
-    AppController(root)
+    app = AppController(root) # Asignar a variable para mantener la referencia
     root.mainloop()
 
 if __name__ == "__main__":
