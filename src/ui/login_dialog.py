@@ -13,7 +13,6 @@ class LoginDialog:
         self.window.resizable(False, False)
         
         # Hacer que la ventana sea modal (bloquea la principal)
-        self.window.transient(parent)
         self.window.grab_set()
         
         # Widgets

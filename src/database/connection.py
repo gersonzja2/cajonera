@@ -1,5 +1,6 @@
 import os
-from sqlalchemy import create_engine, Column, Integer, String
+from datetime import datetime
+from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
 
@@ -19,6 +20,15 @@ class Producto(Base):
     id = Column(Integer, primary_key=True)
     nombre = Column(String, unique=True, nullable=False)
     cantidad = Column(Integer, default=0)
+
+class Movimiento(Base):
+    __tablename__ = 'movimientos'
+
+    id = Column(Integer, primary_key=True)
+    fecha_hora = Column(DateTime, default=datetime.now)
+    tipo_movimiento = Column(String, nullable=False) # 'entrada' o 'salida'
+    cantidad = Column(Integer, nullable=False)
+    usuario_id = Column(String, default="admin") # Guardamos el nombre del usuario (ej. 'admin')
 
 def init_db():
     """Inicializa la base de datos y crea las tablas."""
