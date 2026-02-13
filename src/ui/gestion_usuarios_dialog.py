@@ -41,7 +41,7 @@ class GestionUsuariosDialog:
         self.entry_pass.grid(row=0, column=3, padx=5, pady=5)
 
         tk.Label(frame_crear, text="Rol:").grid(row=1, column=0, padx=5, pady=5)
-        self.combo_rol = ttk.Combobox(frame_crear, values=['vendedor', 'admin'], state="readonly", width=15)
+        self.combo_rol = ttk.Combobox(frame_crear, values=['vendedor', 'almacenista', 'admin'], state="readonly", width=15)
         self.combo_rol.grid(row=1, column=1, padx=5, pady=5)
         self.combo_rol.set('vendedor') # Por defecto, crear usuarios simples
 

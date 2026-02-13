@@ -7,6 +7,7 @@ from src.ui.gestion_clientes_dialog import GestionClientesDialog
 from src.ui.gestion_proveedores_dialog import GestionProveedoresDialog
 from src.ui.configuracion_dialog import ConfiguracionDialog
 from src.ui.devoluciones_dialog import DevolucionesDialog
+from src.ui.recepcion_dialog import RecepcionDialog
 
 class MainWindow:
     def __init__(self, root, usuario, on_logout):
@@ -84,8 +85,8 @@ class MainWindow:
         frame_botones = tk.Frame(self.root)
         frame_botones.pack(pady=30)
 
-        if self.usuario.role == 'admin':
-            btn_agregar = tk.Button(frame_botones, text="Llegada de Cargamento (+)", bg="#d4edda", font=("Arial", 10), command=self.agregar)
+        if self.usuario.role in ['admin', 'almacenista']:
+            btn_agregar = tk.Button(frame_botones, text="Recepción de Cargamento 📦", bg="#d4edda", font=("Arial", 10), command=self.abrir_recepcion)
             btn_agregar.pack(side=tk.LEFT, padx=15)
 
         # Botón para agregar al carrito en lugar de vender directo
@@ -179,6 +180,9 @@ class MainWindow:
     def abrir_devoluciones(self):
         DevolucionesDialog(self.root, self.logic, self.usuario.username, self.actualizar_display)
 
+    def abrir_recepcion(self):
+        RecepcionDialog(self.root, self.logic, self.usuario.username, self.actualizar_display)
+
     def generar_orden_compra(self):
         # 1. Obtener proveedores para que el usuario elija
         proveedores = self.logic.obtener_proveedores()
@@ -253,9 +257,6 @@ class MainWindow:
                 self.actualizar_display()
             else:
                 messagebox.showerror("Error", mensaje)
-
-    def agregar(self):
-        self.procesar_accion(lambda p, c: self.logic.agregar_stock(p, c, self.usuario.username), "Stock Actualizado")
 
     def agregar_al_carrito(self):
         cantidad = self.obtener_cantidad()

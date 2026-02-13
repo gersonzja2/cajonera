@@ -211,6 +211,34 @@ class InventarioLogic:
         finally:
             session.close()
 
+    def confirmar_recepcion(self, items, usuario_id):
+        """Procesa la recepción de un cargamento (varios productos)."""
+        session = SessionLocal()
+        try:
+            for item in items:
+                prod_nombre = item['producto']
+                cantidad = item['cantidad']
+                
+                producto = session.query(Producto).filter_by(nombre=prod_nombre).first()
+                if producto:
+                    producto.cantidad += cantidad
+                    
+                    nuevo_movimiento = Movimiento(
+                        producto_id=producto.id,
+                        tipo_movimiento="entrada",
+                        cantidad=cantidad,
+                        usuario_id=usuario_id
+                    )
+                    session.add(nuevo_movimiento)
+            
+            session.commit()
+            return True, "Stock actualizado correctamente."
+        except Exception as e:
+            session.rollback()
+            return False, str(e)
+        finally:
+            session.close()
+
     def dar_baja_producto(self, nombre_producto):
         """DELETE: Borrado Lógico (Soft Delete)."""
         session = SessionLocal()
