@@ -5,11 +5,22 @@ import re
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-from src.database.connection import SessionLocal, Producto, Movimiento, Usuario, Venta, Cliente, Proveedor
+from src.database.connection import SessionLocal, Producto, Movimiento, Usuario, Venta, Cliente, Proveedor, AuditLog, USER_DIR, PDF_DIR
 
 class InventarioLogic:
     def __init__(self):
-        self.CONFIG_FILE = "config.json"
+        self.CONFIG_FILE = os.path.join(USER_DIR, "config.json")
+        self.current_user = "sistema"
+        self.current_role = "admin" # Rol por defecto para operaciones internas del sistema
+
+    def set_usuario_actual(self, username, role):
+        self.current_user = username
+        self.current_role = role
+
+    def _registrar_auditoria(self, session, accion, detalles, usuario=None):
+        user = usuario if usuario else self.current_user
+        log = AuditLog(usuario=user, accion=accion, detalles=detalles)
+        session.add(log)
 
     def obtener_productos(self):
         """Devuelve una lista con los nombres de todos los productos."""
@@ -23,6 +34,9 @@ class InventarioLogic:
 
     def crear_producto(self, nombre, codigo, categoria, costo, precio, stock_min):
         """Crea un nuevo producto en la base de datos."""
+        if self.current_role != 'admin':
+            return False, "Permiso denegado: Solo administradores."
+
         session = SessionLocal()
         try:
             # CREATE: Regla de unicidad para Nombre y Código
@@ -42,8 +56,29 @@ class InventarioLogic:
                 activo=True
             )
             session.add(nuevo_prod)
+            self._registrar_auditoria(session, "CREAR_PRODUCTO", f"Producto: {nombre}, Precio: {precio}")
             session.commit()
             return True, f"Producto '{nombre}' creado."
+        except Exception as e:
+            return False, str(e)
+        finally:
+            session.close()
+
+    def actualizar_precio_producto(self, nombre_producto, nuevo_precio):
+        """Actualiza el precio de venta de un producto y registra el cambio en auditoría."""
+        if self.current_role != 'admin':
+            return False, "Permiso denegado: Solo administradores."
+
+        session = SessionLocal()
+        try:
+            producto = session.query(Producto).filter_by(nombre=nombre_producto, activo=True).first()
+            if producto:
+                precio_anterior = producto.precio_venta
+                producto.precio_venta = nuevo_precio
+                self._registrar_auditoria(session, "MODIFICAR_PRECIO", f"Producto: {nombre_producto}, De: {precio_anterior} a {nuevo_precio}")
+                session.commit()
+                return True, f"Precio actualizado a ${nuevo_precio}."
+            return False, "Producto no encontrado."
         except Exception as e:
             return False, str(e)
         finally:
@@ -77,6 +112,9 @@ class InventarioLogic:
 
     def agregar_stock(self, nombre_producto, cantidad, usuario_id="admin"):
         """Agrega cantidad al stock existente de un producto."""
+        if self.current_role not in ['admin', 'almacenista']:
+            return False, "Permiso denegado: Rol insuficiente."
+
         session = SessionLocal()
         try:
             producto = session.query(Producto).filter_by(nombre=nombre_producto, activo=True).first()
@@ -92,6 +130,7 @@ class InventarioLogic:
                 )
                 session.add(nuevo_movimiento)
                 
+                self._registrar_auditoria(session, "AGREGAR_STOCK", f"Producto: {nombre_producto}, Cant: {cantidad}", usuario_id)
                 session.commit()
                 return True, f"Se agregaron {cantidad} unidades a {nombre_producto}."
             return False, "Producto no encontrado en la base de datos."
@@ -103,6 +142,9 @@ class InventarioLogic:
 
     def vender_stock(self, nombre_producto, cantidad, usuario_id="admin", nombre_cliente=None):
         """Resta cantidad del stock si hay suficiente."""
+        if self.current_role not in ['admin', 'vendedor']:
+            return False, "Permiso denegado: Rol insuficiente para vender."
+
         session = SessionLocal()
         try:
             producto = session.query(Producto).filter_by(nombre=nombre_producto, activo=True).first()
@@ -140,6 +182,7 @@ class InventarioLogic:
                     )
                     session.add(nuevo_movimiento)
                     
+                    self._registrar_auditoria(session, "VENTA_DIRECTA", f"Producto: {nombre_producto}, Cant: {cantidad}", usuario_id)
                     session.commit()
                     return True, f"Se vendieron {cantidad} unidades de {nombre_producto}."
                 else:
@@ -153,6 +196,9 @@ class InventarioLogic:
 
     def confirmar_venta_carrito(self, items_carrito, usuario_id, nombre_cliente=None):
         """Procesa una lista de items del carrito como una única transacción."""
+        if self.current_role not in ['admin', 'vendedor']:
+            return False, "Permiso denegado: Rol insuficiente para vender."
+
         session = SessionLocal()
         try:
             # 1. Validar stock para todos los items antes de procesar nada
@@ -202,6 +248,7 @@ class InventarioLogic:
                 )
                 session.add(nuevo_movimiento)
 
+            self._registrar_auditoria(session, "VENTA_CARRITO", f"Items: {len(items_carrito)}", usuario_id)
             session.commit()
             return True, "Venta realizada con éxito."
 
@@ -213,6 +260,9 @@ class InventarioLogic:
 
     def confirmar_recepcion(self, items, usuario_id):
         """Procesa la recepción de un cargamento (varios productos)."""
+        if self.current_role not in ['admin', 'almacenista']:
+            return False, "Permiso denegado: Rol insuficiente."
+
         session = SessionLocal()
         try:
             for item in items:
@@ -231,6 +281,7 @@ class InventarioLogic:
                     )
                     session.add(nuevo_movimiento)
             
+            self._registrar_auditoria(session, "RECEPCION_CARGAMENTO", f"Items: {len(items)}", usuario_id)
             session.commit()
             return True, "Stock actualizado correctamente."
         except Exception as e:
@@ -241,11 +292,15 @@ class InventarioLogic:
 
     def dar_baja_producto(self, nombre_producto):
         """DELETE: Borrado Lógico (Soft Delete)."""
+        if self.current_role != 'admin':
+            return False, "Permiso denegado: Solo administradores."
+
         session = SessionLocal()
         try:
             producto = session.query(Producto).filter_by(nombre=nombre_producto).first()
             if producto:
                 producto.activo = False # No borramos, solo desactivamos
+                self._registrar_auditoria(session, "BAJA_PRODUCTO", f"Producto: {nombre_producto}")
                 session.commit()
                 return True, f"Producto '{nombre_producto}' dado de baja correctamente."
             return False, "Producto no encontrado."
@@ -256,6 +311,9 @@ class InventarioLogic:
 
     def crear_usuario(self, username, password, role):
         """Crea un nuevo usuario en la base de datos."""
+        if self.current_role != 'admin':
+            return False, "Permiso denegado: Solo administradores."
+
         session = SessionLocal()
         try:
             if session.query(Usuario).filter_by(username=username).first():
@@ -268,8 +326,33 @@ class InventarioLogic:
                 role=role
             )
             session.add(nuevo_usuario)
+            self._registrar_auditoria(session, "CREAR_USUARIO", f"Usuario creado: {username}, Rol: {role}")
             session.commit()
             return True, f"Usuario '{username}' creado con éxito."
+        except Exception as e:
+            session.rollback()
+            return False, str(e)
+        finally:
+            session.close()
+
+    def eliminar_usuario(self, username_a_eliminar):
+        """Elimina un usuario, con protecciones para no borrar al propio usuario o al último admin."""
+        if self.current_role != 'admin':
+            return False, "Permiso denegado: Solo administradores."
+
+        if username_a_eliminar == self.current_user:
+            return False, "No puedes eliminar tu propio usuario mientras estás logueado."
+
+        session = SessionLocal()
+        try:
+            user = session.query(Usuario).filter_by(username=username_a_eliminar).first()
+            if not user:
+                return False, "Usuario no encontrado."
+            
+            session.delete(user)
+            self._registrar_auditoria(session, "ELIMINAR_USUARIO", f"Usuario eliminado: {username_a_eliminar}")
+            session.commit()
+            return True, f"Usuario '{username_a_eliminar}' eliminado correctamente."
         except Exception as e:
             session.rollback()
             return False, str(e)
@@ -302,6 +385,9 @@ class InventarioLogic:
 
     def crear_proveedor(self, nombre, contacto, telefono, email):
         """Crea un nuevo proveedor."""
+        if self.current_role != 'admin':
+            return False, "Permiso denegado: Solo administradores."
+
         session = SessionLocal()
         try:
             if session.query(Proveedor).filter_by(nombre=nombre).first():
@@ -336,7 +422,7 @@ class InventarioLogic:
 
             # Sanitizar nombre de archivo
             nombre_safe = re.sub(r'[^\w\s-]', '', nombre_proveedor).strip().replace(' ', '_')
-            filename = f"Orden_Compra_{nombre_safe}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filename = os.path.join(PDF_DIR, f"Orden_Compra_{nombre_safe}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
             
             # Obtener nombre de la empresa desde config
             config = self.obtener_configuracion()
@@ -374,7 +460,8 @@ class InventarioLogic:
                     y = 750
 
             c.save()
-            return True, f"Orden generada: {filename}"
+            # Nota: No guardamos log en DB para generación de PDF, pero podríamos.
+            return True, f"Orden generada en:\n{filename}"
         except Exception as e:
             return False, str(e)
         finally:
@@ -403,6 +490,9 @@ class InventarioLogic:
 
     def realizar_devolucion(self, venta_id, usuario_id):
         """Procesa la devolución: restaura stock y crea contra-asiento financiero."""
+        if self.current_role != 'admin':
+            return False, "Permiso denegado: Solo administradores."
+
         session = SessionLocal()
         try:
             venta_original = session.query(Venta).get(venta_id)
@@ -440,6 +530,7 @@ class InventarioLogic:
             )
             session.add(movimiento)
 
+            self._registrar_auditoria(session, "DEVOLUCION", f"Venta ID: {venta_id}, Producto ID: {venta_original.producto_id}", usuario_id)
             session.commit()
             return True, "Devolución procesada correctamente. Stock restaurado y caja ajustada."
         except Exception as e:
@@ -475,6 +566,8 @@ class InventarioLogic:
         try:
             user = session.query(Usuario).filter_by(username=username).first()
             if user and bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
+                self._registrar_auditoria(session, "LOGIN", "Inicio de sesión exitoso", usuario=username)
+                session.commit()
                 return user
             return None
         finally:
@@ -492,6 +585,18 @@ class InventarioLogic:
 
     def guardar_configuracion(self, datos):
         """Guarda la configuración en un archivo JSON."""
+        if self.current_role != 'admin':
+            return False, "Permiso denegado: Solo administradores."
+
         with open(self.CONFIG_FILE, "w") as f:
             json.dump(datos, f, indent=4)
+        
+        # Registrar en DB
+        session = SessionLocal()
+        try:
+            self._registrar_auditoria(session, "CONFIGURACION", f"Cambio config: {datos}")
+            session.commit()
+        finally:
+            session.close()
+            
         return True, "Configuración guardada correctamente."

@@ -19,6 +19,7 @@ class MainWindow:
         
         # Instanciar el controlador (Lógica)
         self.logic = InventarioLogic()
+        self.logic.set_usuario_actual(self.usuario.username, self.usuario.role)
         self.carrito = [] # Lista para almacenar items del carrito
         
         self.setup_ui()
@@ -46,6 +47,8 @@ class MainWindow:
             btn_nuevo.pack(side=tk.LEFT, padx=5)
             btn_eliminar = tk.Button(frame_prod, text="🗑️", fg="red", command=self.eliminar_producto)
             btn_eliminar.pack(side=tk.LEFT, padx=5)
+            btn_editar = tk.Button(frame_prod, text="💲", fg="orange", command=self.cambiar_precio)
+            btn_editar.pack(side=tk.LEFT, padx=5)
             btn_ganancias = tk.Button(frame_prod, text="💰", fg="green", command=self.ver_ganancias)
             btn_ganancias.pack(side=tk.LEFT, padx=5)
             btn_gestion_usr = tk.Button(frame_prod, text="👤", command=self.abrir_gestion_usuarios)
@@ -168,6 +171,21 @@ class MainWindow:
             else:
                 messagebox.showerror("Error", mensaje)
 
+    def cambiar_precio(self):
+        producto = self.combo_productos.get()
+        if not producto:
+            messagebox.showwarning("Atención", "Seleccione un producto para modificar su precio.")
+            return
+        
+        nuevo_precio = simpledialog.askfloat("Modificar Precio", f"Ingrese el nuevo precio para '{producto}':", parent=self.root)
+        if nuevo_precio is not None and nuevo_precio >= 0:
+            exito, msg = self.logic.actualizar_precio_producto(producto, nuevo_precio)
+            if exito:
+                messagebox.showinfo("Éxito", msg)
+                self.actualizar_display()
+            else:
+                messagebox.showerror("Error", msg)
+
     def abrir_gestion_usuarios(self):
         GestionUsuariosDialog(self.root, self.logic)
 
@@ -175,7 +193,7 @@ class MainWindow:
         GestionProveedoresDialog(self.root, self.logic)
 
     def abrir_configuracion(self):
-        ConfiguracionDialog(self.root)
+        ConfiguracionDialog(self.root, self.logic)
 
     def abrir_devoluciones(self):
         DevolucionesDialog(self.root, self.logic, self.usuario.username, self.actualizar_display)

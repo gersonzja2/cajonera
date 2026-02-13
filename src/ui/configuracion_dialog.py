@@ -3,8 +3,8 @@ from tkinter import messagebox
 from src.logic.inventario_logic import InventarioLogic
 
 class ConfiguracionDialog:
-    def __init__(self, parent):
-        self.logic = InventarioLogic()
+    def __init__(self, parent, logic=None):
+        self.logic = logic if logic else InventarioLogic()
         self.window = tk.Toplevel(parent)
         self.window.title("Configuración")
         self.window.geometry("350x250")

@@ -15,17 +15,20 @@ class GestionUsuariosDialog:
         frame_lista = tk.LabelFrame(self.window, text="Usuarios Existentes")
         frame_lista.pack(fill="both", expand=True, padx=10, pady=5)
         
+        btn_eliminar = tk.Button(frame_lista, text="Eliminar Seleccionado 🗑️", fg="red", command=self.eliminar_usuario)
+        btn_eliminar.pack(side=tk.BOTTOM, pady=5)
+
         self.tree = ttk.Treeview(frame_lista, columns=("Usuario", "Rol"), show="headings", height=8)
         self.tree.heading("Usuario", text="Usuario")
         self.tree.heading("Rol", text="Rol")
         self.tree.column("Usuario", width=200)
         self.tree.column("Rol", width=150)
-        self.tree.pack(side=tk.LEFT, fill="both", expand=True, padx=5, pady=5)
         
         scrollbar = ttk.Scrollbar(frame_lista, orient="vertical", command=self.tree.yview)
         scrollbar.pack(side=tk.RIGHT, fill="y")
+        self.tree.pack(side=tk.LEFT, fill="both", expand=True, padx=5, pady=5)
         self.tree.configure(yscrollcommand=scrollbar.set)
-        
+
         self.cargar_usuarios()
 
         # --- Formulario de Creación (Abajo) ---
@@ -74,3 +77,20 @@ class GestionUsuariosDialog:
             self.cargar_usuarios() # Recargar la lista
         else:
             messagebox.showerror("Error", mensaje)
+
+    def eliminar_usuario(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Atención", "Seleccione un usuario para eliminar.")
+            return
+        
+        username = self.tree.item(selected[0])['values'][0]
+        confirm = messagebox.askyesno("Confirmar", f"¿Está seguro de eliminar al usuario '{username}'?")
+        
+        if confirm:
+            exito, msg = self.logic.eliminar_usuario(username)
+            if exito:
+                messagebox.showinfo("Éxito", msg)
+                self.cargar_usuarios()
+            else:
+                messagebox.showerror("Error", msg)

@@ -9,12 +9,23 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
+# --- Configuración de Rutas (User Data) ---
+# Usamos la carpeta de Documentos del usuario para garantizar permisos de escritura
+USER_DIR = os.path.join(os.path.expanduser("~"), "Documents", "Cajonera")
+DATA_DIR = os.path.join(USER_DIR, "data")
+BACKUP_DIR = os.path.join(USER_DIR, "backups")
+PDF_DIR = os.path.join(USER_DIR, "pdf")
+
+for d in [USER_DIR, DATA_DIR, BACKUP_DIR, PDF_DIR]:
+    if not os.path.exists(d):
+        os.makedirs(d)
+
 # Configuración de la Base de Datos
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data/cajonera.db")
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(DATA_DIR, 'cajonera.db')}")
 
 Base = declarative_base()
 engine = create_engine(DATABASE_URL, echo=False)
-SessionLocal = sessionmaker(bind=engine)
+SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 class Producto(Base):
     __tablename__ = 'productos'
@@ -77,6 +88,15 @@ class Usuario(Base):
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False) # 'admin' or 'vendedor'
 
+class AuditLog(Base):
+    __tablename__ = 'audit_logs'
+
+    id = Column(Integer, primary_key=True)
+    fecha_hora = Column(DateTime, default=datetime.now)
+    usuario = Column(String, nullable=False)
+    accion = Column(String, nullable=False)
+    detalles = Column(String, nullable=True)
+
 def init_db():
     """Inicializa la base de datos y crea las tablas."""
     Base.metadata.create_all(engine)
@@ -93,11 +113,14 @@ def init_db():
 
 def backup_db():
     """Crea una copia de seguridad de la base de datos al cerrar."""
-    if not os.path.exists("backups"):
-        os.makedirs("backups")
-    
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    db_path = "data/cajonera.db"
+    
+    # Extraer ruta del archivo DB actual desde la URL
+    if DATABASE_URL.startswith("sqlite:///"):
+        db_path = DATABASE_URL.replace("sqlite:///", "")
+    else:
+        db_path = os.path.join(DATA_DIR, "cajonera.db")
+
     if os.path.exists(db_path):
-        backup_path = f"backups/cajonera_backup_{timestamp}.db"
+        backup_path = os.path.join(BACKUP_DIR, f"cajonera_backup_{timestamp}.db")
         shutil.copy2(db_path, backup_path)

@@ -1,18 +1,24 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
-# Entornos Virtuales
+# Entorno Virtual
 venv/
 env/
 
-# Variables de Entorno (Secretos)
+# Variables de Entorno
 .env
 
-# Base de Datos
-*.db
-data/*.db
+# Archivos de Sistema
+.DS_Store
+Thumbs.db
 
-# IDE
+# IDEs
 .vscode/
 .idea/
+
+# Logs y Datos Locales (si se ejecutara localmente fuera de Documentos)
+*.log
+*.sqlite
+*.db

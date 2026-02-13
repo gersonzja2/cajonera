@@ -8,6 +8,7 @@ Sistema de gestión de inventario y punto de venta (POS) desarrollado en Python.
 - **Punto de Venta (POS)**: Carrito de compras para múltiples productos, cálculo automático de totales y validación de stock.
 - **Gestión Financiera**: Registro de ventas, cálculo de márgenes de ganancia y reportes financieros (Ingresos vs Costos).
 - **Roles de Usuario**: Sistema de login con roles (Admin/Vendedor). Contraseñas encriptadas.
+- **Auditoría Avanzada**: Registro detallado de acciones (quién vendió, quién modificó precios, etc.).
 - **Gestión de Terceros**: Base de datos de Clientes y Proveedores.
 - **Automatización**: Generación de Órdenes de Compra en PDF y copias de seguridad automáticas de la base de datos.
 
@@ -26,8 +27,8 @@ Sistema de gestión de inventario y punto de venta (POS) desarrollado en Python.
 - `src/database/connection.py`: Modelos de base de datos y configuración.
 - `src/logic/inventario_logic.py`: Lógica de negocio y controladores.
 - `src/ui/`: Interfaces gráficas (Ventana principal, diálogos de gestión).
-- `data/`: Almacenamiento de la base de datos (`cajonera.db`).
-- `backups/`: Copias de seguridad automáticas.
+
+**Nota:** Los datos de la aplicación (Base de datos, Backups, PDFs y Configuración) se guardan automáticamente en la carpeta **Documentos/Cajonera** del usuario actual para garantizar la persistencia y seguridad de los datos.
 
 ## Instalación y Configuración
 
@@ -46,12 +47,17 @@ Sistema de gestión de inventario y punto de venta (POS) desarrollado en Python.
    ```
    *Asegúrate de que `requirements.txt` incluya: `sqlalchemy`, `python-dotenv`, `bcrypt`, `reportlab`.*
 
-4. **Configuración**:
-   El sistema crea automáticamente la base de datos en `data/cajonera.db` al iniciar.
+4. **Primer Inicio**:
+   Al ejecutar la aplicación por primera vez, se creará automáticamente la carpeta `Cajonera` en tus Documentos con la base de datos inicializada.
    
    **Credenciales por defecto:**
    - **Usuario**: `admin`
    - **Contraseña**: `admin`
+
+   **Roles Disponibles:**
+   - `admin`: Acceso total.
+   - `vendedor`: Solo ventas.
+   - `almacenista`: Solo recepción de stock.
 
 ## Ejecución
 
