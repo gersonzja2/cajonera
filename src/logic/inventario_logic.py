@@ -1,5 +1,8 @@
 import bcrypt
-from src.database.connection import SessionLocal, Producto, Movimiento, Usuario, Venta
+from datetime import datetime
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from src.database.connection import SessionLocal, Producto, Movimiento, Usuario, Venta, Cliente, Proveedor
 
 class InventarioLogic:
     def __init__(self):
@@ -95,7 +98,7 @@ class InventarioLogic:
         finally:
             session.close()
 
-    def vender_stock(self, nombre_producto, cantidad, usuario_id="admin"):
+    def vender_stock(self, nombre_producto, cantidad, usuario_id="admin", nombre_cliente=None):
         """Resta cantidad del stock si hay suficiente."""
         session = SessionLocal()
         try:
@@ -105,13 +108,23 @@ class InventarioLogic:
                     # 1. Restar Stock
                     producto.cantidad -= cantidad
                     
+                    # Buscar ID del cliente si existe
+                    cliente_id = None
+                    if nombre_cliente:
+                        cliente = session.query(Cliente).filter_by(nombre=nombre_cliente).first()
+                        if cliente:
+                            cliente_id = cliente.id
+
                     # 2. Registrar Venta (Financiero)
                     total_venta = producto.precio_venta * cantidad
+                    ganancia_venta = (producto.precio_venta - producto.precio_costo) * cantidad
                     nueva_venta = Venta(
                         producto_id=producto.id,
                         cantidad=cantidad,
                         total=total_venta,
-                        usuario_id=usuario_id
+                        ganancia=ganancia_venta,
+                        usuario_id=usuario_id,
+                        cliente_id=cliente_id
                     )
                     session.add(nueva_venta)
 
@@ -132,6 +145,59 @@ class InventarioLogic:
         except Exception as e:
             session.rollback()
             return False, f"Error de base de datos: {str(e)}"
+        finally:
+            session.close()
+
+    def confirmar_venta_carrito(self, items_carrito, usuario_id, nombre_cliente=None):
+        """Procesa una lista de items del carrito como una única transacción."""
+        session = SessionLocal()
+        try:
+            # 1. Validar stock para todos los items antes de procesar nada
+            cliente_id = None
+            if nombre_cliente:
+                cliente = session.query(Cliente).filter_by(nombre=nombre_cliente).first()
+                if cliente:
+                    cliente_id = cliente.id
+
+            for item in items_carrito:
+                prod_nombre = item['producto']
+                cantidad = item['cantidad']
+                
+                producto = session.query(Producto).filter_by(nombre=prod_nombre, activo=True).first()
+                if not producto:
+                    return False, f"Producto '{prod_nombre}' no encontrado."
+                if producto.cantidad < cantidad:
+                    return False, f"Stock insuficiente para '{prod_nombre}'. Stock: {producto.cantidad}, Solicitado: {cantidad}"
+
+                # 2. Si hay stock, preparamos la operación (dentro de la misma transacción)
+                producto.cantidad -= cantidad
+
+                total_venta = producto.precio_venta * cantidad
+                ganancia_venta = (producto.precio_venta - producto.precio_costo) * cantidad
+                nueva_venta = Venta(
+                    producto_id=producto.id,
+                    cantidad=cantidad,
+                    total=total_venta,
+                    ganancia=ganancia_venta,
+                    usuario_id=usuario_id,
+                    cliente_id=cliente_id
+                )
+                session.add(nueva_venta)
+
+                nuevo_movimiento = Movimiento(
+                    producto_id=producto.id,
+                    tipo_movimiento="salida",
+                    cantidad=cantidad,
+                    usuario_id=usuario_id
+                )
+                session.add(nuevo_movimiento)
+
+            session.commit()
+            return True, "Venta realizada con éxito."
+
+        except Exception as e:
+            session.rollback()
+            return False, f"Error al procesar venta: {str(e)}"
         finally:
             session.close()
 
@@ -172,12 +238,121 @@ class InventarioLogic:
         finally:
             session.close()
 
-    def obtener_reporte_ganancias(self):
-        """Calcula el total vendido (Solo Admins)."""
+    def obtener_clientes(self):
+        """Devuelve una lista con los nombres de todos los clientes."""
+        session = SessionLocal()
+        try:
+            clientes = session.query(Cliente).all()
+            return [c.nombre for c in clientes]
+        finally:
+            session.close()
+
+    def crear_cliente(self, nombre, telefono, email):
+        """Crea un nuevo cliente."""
+        session = SessionLocal()
+        try:
+            if session.query(Cliente).filter_by(nombre=nombre).first():
+                return False, "El cliente ya existe."
+            nuevo = Cliente(nombre=nombre, telefono=telefono, email=email)
+            session.add(nuevo)
+            session.commit()
+            return True, "Cliente registrado correctamente."
+        except Exception as e:
+            return False, str(e)
+        finally:
+            session.close()
+
+    def crear_proveedor(self, nombre, contacto, telefono, email):
+        """Crea un nuevo proveedor."""
+        session = SessionLocal()
+        try:
+            if session.query(Proveedor).filter_by(nombre=nombre).first():
+                return False, "El proveedor ya existe."
+            nuevo = Proveedor(nombre=nombre, contacto=contacto, telefono=telefono, email=email)
+            session.add(nuevo)
+            session.commit()
+            return True, "Proveedor registrado correctamente."
+        except Exception as e:
+            return False, str(e)
+        finally:
+            session.close()
+
+    def obtener_proveedores(self):
+        """Devuelve una lista con los nombres de todos los proveedores."""
+        session = SessionLocal()
+        try:
+            proveedores = session.query(Proveedor).all()
+            return [p.nombre for p in proveedores]
+        finally:
+            session.close()
+
+    def generar_orden_compra_pdf(self, nombre_proveedor):
+        """Genera un PDF con los productos que tienen stock bajo."""
+        session = SessionLocal()
+        try:
+            # Buscar productos con stock bajo (cantidad <= stock_minimo)
+            productos_bajo_stock = session.query(Producto).filter(Producto.activo == True, Producto.cantidad <= Producto.stock_minimo).all()
+            
+            if not productos_bajo_stock:
+                return False, "No hay productos con stock bajo para pedir."
+
+            filename = f"Orden_Compra_{nombre_proveedor}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            c = canvas.Canvas(filename, pagesize=letter)
+            
+            # Encabezado
+            c.setFont("Helvetica-Bold", 16)
+            c.drawString(50, 750, f"ORDEN DE COMPRA")
+            c.setFont("Helvetica", 12)
+            c.drawString(50, 730, f"Proveedor: {nombre_proveedor}")
+            c.drawString(50, 715, f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+            # Tabla de productos
+            y = 680
+            c.drawString(50, y, "Producto / SKU")
+            c.drawString(300, y, "Stock Actual")
+            c.drawString(400, y, "Sugerido a Pedir")
+            y -= 20
+            c.line(50, y+15, 500, y+15)
+
+            for p in productos_bajo_stock:
+                sugerido = (p.stock_minimo * 2) - p.cantidad # Lógica simple: pedir hasta duplicar el mínimo
+                if sugerido < 0: sugerido = 0
+                
+                nombre_display = f"{p.nombre} ({p.codigo})" if p.codigo else p.nombre
+                c.drawString(50, y, nombre_display)
+                c.drawString(300, y, str(p.cantidad))
+                c.drawString(400, y, str(sugerido))
+                y -= 20
+                
+                if y < 50: # Nueva página si se acaba el espacio
+                    c.showPage()
+                    y = 750
+
+            c.save()
+            return True, f"Orden generada: {filename}"
+        except Exception as e:
+            return False, str(e)
+        finally:
+            session.close()
+
+    def obtener_reporte_financiero(self):
+        """Calcula ventas totales, costos y ganancia neta."""
         session = SessionLocal()
         try:
             ventas = session.query(Venta).all()
-            return sum(v.total for v in ventas)
+            total_ventas = sum(v.total for v in ventas)
+            total_ganancia = sum(v.ganancia for v in ventas)
+            total_costos = total_ventas - total_ganancia
+            return total_ventas, total_costos, total_ganancia
+        finally:
+            session.close()
+
+    def obtener_usuarios(self):
+        """Devuelve una lista de todos los usuarios y sus roles."""
+        session = SessionLocal()
+        try:
+            usuarios = session.query(Usuario).all()
+            return [{"username": u.username, "role": u.role} for u in usuarios]
         finally:
             session.close()
 

@@ -31,7 +31,7 @@ def main():
     init_db()
     root = tk.Tk()
     root.title("Sistema de Inventario")
-    root.geometry("550x450") # Un poco más ancho para los nuevos botones
+    root.geometry("900x500") # Un poco más ancho para los nuevos botones
     AppController(root)
     root.mainloop()
 

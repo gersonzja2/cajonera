@@ -39,15 +39,34 @@ class Movimiento(Base):
     cantidad = Column(Integer, nullable=False)
     usuario_id = Column(String, default="admin") # Guardamos el nombre del usuario (ej. 'admin')
 
+class Cliente(Base):
+    __tablename__ = 'clientes'
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String, unique=True, nullable=False)
+    telefono = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+
 class Venta(Base):
     __tablename__ = 'ventas'
 
     id = Column(Integer, primary_key=True)
     fecha_hora = Column(DateTime, default=datetime.now)
     producto_id = Column(Integer, ForeignKey('productos.id'))
+    cliente_id = Column(Integer, ForeignKey('clientes.id'), nullable=True) # Puede ser nulo (Consumidor Final)
     cantidad = Column(Integer, nullable=False)
     total = Column(Float, nullable=False) # Precio Venta * Cantidad
+    ganancia = Column(Float, default=0.0) # (Precio Venta - Precio Costo) * Cantidad
     usuario_id = Column(String, default="admin")
+
+class Proveedor(Base):
+    __tablename__ = 'proveedores'
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String, unique=True, nullable=False)
+    contacto = Column(String, nullable=True)
+    telefono = Column(String, nullable=True)
+    email = Column(String, nullable=True)
 
 class Usuario(Base):
     __tablename__ = 'usuarios'
