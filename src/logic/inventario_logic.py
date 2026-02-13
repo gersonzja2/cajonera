@@ -1,4 +1,5 @@
-from src.database.connection import SessionLocal, Producto, Movimiento
+import bcrypt
+from src.database.connection import SessionLocal, Producto, Movimiento, Usuario
 
 class InventarioLogic:
     def __init__(self):
@@ -38,7 +39,7 @@ class InventarioLogic:
         finally:
             session.close()
 
-    def agregar_stock(self, nombre_producto, cantidad):
+    def agregar_stock(self, nombre_producto, cantidad, usuario_id="admin"):
         """Agrega cantidad al stock existente de un producto."""
         session = SessionLocal()
         try:
@@ -50,7 +51,7 @@ class InventarioLogic:
                 nuevo_movimiento = Movimiento(
                     tipo_movimiento="entrada",
                     cantidad=cantidad,
-                    usuario_id="admin"
+                    usuario_id=usuario_id
                 )
                 session.add(nuevo_movimiento)
                 
@@ -63,7 +64,7 @@ class InventarioLogic:
         finally:
             session.close()
 
-    def vender_stock(self, nombre_producto, cantidad):
+    def vender_stock(self, nombre_producto, cantidad, usuario_id="admin"):
         """Resta cantidad del stock si hay suficiente."""
         session = SessionLocal()
         try:
@@ -76,7 +77,7 @@ class InventarioLogic:
                     nuevo_movimiento = Movimiento(
                         tipo_movimiento="salida",
                         cantidad=cantidad,
-                        usuario_id="admin"
+                        usuario_id=usuario_id
                     )
                     session.add(nuevo_movimiento)
                     
@@ -88,5 +89,16 @@ class InventarioLogic:
         except Exception as e:
             session.rollback()
             return False, f"Error de base de datos: {str(e)}"
+        finally:
+            session.close()
+
+    def autenticar_usuario(self, username, password):
+        """Verifica las credenciales del usuario."""
+        session = SessionLocal()
+        try:
+            user = session.query(Usuario).filter_by(username=username).first()
+            if user and bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
+                return user
+            return None
         finally:
             session.close()

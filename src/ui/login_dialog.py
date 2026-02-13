@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
+from src.logic.inventario_logic import InventarioLogic
 
 class LoginDialog:
     def __init__(self, parent, on_login_success):
@@ -34,12 +35,14 @@ class LoginDialog:
         usuario = self.entry_user.get()
         password = self.entry_pass.get()
         
-        # Validación simple (puedes conectarlo a DB si deseas más adelante)
-        if usuario == "admin" and password == "admin":
+        logic = InventarioLogic()
+        user = logic.autenticar_usuario(usuario, password)
+        
+        if user:
             self.window.destroy()
-            self.on_login_success()
+            self.on_login_success(user)
         else:
-            messagebox.showerror("Error", "Credenciales incorrectas.\nPrueba: admin / admin")
+            messagebox.showerror("Error", "Credenciales incorrectas.")
 
     def on_close(self):
         self.parent.destroy()

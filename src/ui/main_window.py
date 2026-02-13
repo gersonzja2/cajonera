@@ -4,8 +4,9 @@ from src.logic.inventario_logic import InventarioLogic
 from src.ui.crear_producto_dialog import CrearProductoDialog
 
 class MainWindow:
-    def __init__(self, root):
+    def __init__(self, root, usuario):
         self.root = root
+        self.usuario = usuario
         self.root.title("Inventario Cajonera - Cartón")
         self.root.geometry("450x400")
         
@@ -31,8 +32,9 @@ class MainWindow:
         self.combo_productos.pack(side=tk.LEFT, padx=5)
         self.combo_productos.bind("<<ComboboxSelected>>", lambda e: self.actualizar_display())
         
-        btn_nuevo = tk.Button(frame_prod, text="+", command=self.abrir_crear_producto)
-        btn_nuevo.pack(side=tk.LEFT, padx=5)
+        if self.usuario.role == 'admin':
+            btn_nuevo = tk.Button(frame_prod, text="+", command=self.abrir_crear_producto)
+            btn_nuevo.pack(side=tk.LEFT, padx=5)
 
         # Display Stock
         self.label_stock = tk.Label(self.root, text="Stock Actual: ...", font=("Arial", 16), fg="#333")
@@ -50,8 +52,9 @@ class MainWindow:
         frame_botones = tk.Frame(self.root)
         frame_botones.pack(pady=30)
 
-        btn_agregar = tk.Button(frame_botones, text="Llegada de Cargamento (+)", bg="#d4edda", font=("Arial", 10), command=self.agregar)
-        btn_agregar.pack(side=tk.LEFT, padx=15)
+        if self.usuario.role == 'admin':
+            btn_agregar = tk.Button(frame_botones, text="Llegada de Cargamento (+)", bg="#d4edda", font=("Arial", 10), command=self.agregar)
+            btn_agregar.pack(side=tk.LEFT, padx=15)
 
         btn_vender = tk.Button(frame_botones, text="Venta Realizada (-)", bg="#f8d7da", font=("Arial", 10), command=self.vender)
         btn_vender.pack(side=tk.LEFT, padx=15)
@@ -75,9 +78,14 @@ class MainWindow:
         producto = self.combo_productos.get()
         if producto:
             cantidad = self.logic.obtener_stock_actual(producto)
-            self.label_stock.config(text=f"Stock Actual ({producto}): {cantidad} unidades")
+            
+            # Alerta de stock bajo (menos de 50 unidades)
+            if cantidad < 50:
+                self.label_stock.config(text=f"Stock Actual ({producto}): {cantidad} unidades ⚠️", fg="red")
+            else:
+                self.label_stock.config(text=f"Stock Actual ({producto}): {cantidad} unidades", fg="#333")
         else:
-            self.label_stock.config(text="Stock Actual: -")
+            self.label_stock.config(text="Stock Actual: -", fg="#333")
 
     def obtener_cantidad(self):
         try:
@@ -108,7 +116,7 @@ class MainWindow:
                 messagebox.showerror("Error", mensaje)
 
     def agregar(self):
-        self.procesar_accion(self.logic.agregar_stock, "Stock Actualizado")
+        self.procesar_accion(lambda p, c: self.logic.agregar_stock(p, c, self.usuario.username), "Stock Actualizado")
 
     def vender(self):
-        self.procesar_accion(self.logic.vender_stock, "Venta Exitosa")
+        self.procesar_accion(lambda p, c: self.logic.vender_stock(p, c, self.usuario.username), "Venta Exitosa")

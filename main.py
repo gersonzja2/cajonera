@@ -12,9 +12,9 @@ def main():
     root.withdraw() # Ocultamos la ventana principal al inicio
 
     # 3. Función callback para cuando el login es exitoso
-    def iniciar_aplicacion():
+    def iniciar_aplicacion(usuario):
         root.deiconify() # Mostrar ventana principal
-        MainWindow(root) # Cargar la vista principal
+        MainWindow(root, usuario) # Cargar la vista principal
 
     # 4. Lanzar Login
     LoginDialog(root, on_login_success=iniciar_aplicacion)
