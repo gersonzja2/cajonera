@@ -17,11 +17,11 @@ class LoginDialog:
         self.window.grab_set()
         
         # Widgets
-        tk.Label(self.window, text="Usuario (admin):").pack(pady=5)
+        tk.Label(self.window, text="Usuario:").pack(pady=5)
         self.entry_user = tk.Entry(self.window)
         self.entry_user.pack(pady=5)
         
-        tk.Label(self.window, text="Contraseña (admin):").pack(pady=5)
+        tk.Label(self.window, text="Contraseña:").pack(pady=5)
         self.entry_pass = tk.Entry(self.window, show="*")
         self.entry_pass.pack(pady=5)
         

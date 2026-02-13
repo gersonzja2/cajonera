@@ -2,13 +2,15 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from src.logic.inventario_logic import InventarioLogic
 from src.ui.crear_producto_dialog import CrearProductoDialog
+from src.ui.gestion_usuarios_dialog import GestionUsuariosDialog
 
 class MainWindow:
-    def __init__(self, root, usuario):
+    def __init__(self, root, usuario, on_logout):
         self.root = root
         self.usuario = usuario
-        self.root.title("Inventario Cajonera - Cartón")
-        self.root.geometry("450x400")
+        self.on_logout = on_logout
+        self.root.winfo_toplevel().title("Inventario Cajonera")
+        self.root.winfo_toplevel().geometry("450x400")
         
         # Instanciar el controlador (Lógica)
         self.logic = InventarioLogic()
@@ -19,7 +21,7 @@ class MainWindow:
 
     def setup_ui(self):
         # Título
-        self.label_titulo = tk.Label(self.root, text="Control de Stock: Cartón", font=("Arial", 18, "bold"))
+        self.label_titulo = tk.Label(self.root, text="Control de Stock", font=("Arial", 18, "bold"))
         self.label_titulo.pack(pady=20)
 
         # Selección de Producto
@@ -35,6 +37,12 @@ class MainWindow:
         if self.usuario.role == 'admin':
             btn_nuevo = tk.Button(frame_prod, text="+", command=self.abrir_crear_producto)
             btn_nuevo.pack(side=tk.LEFT, padx=5)
+            btn_eliminar = tk.Button(frame_prod, text="🗑️", fg="red", command=self.eliminar_producto)
+            btn_eliminar.pack(side=tk.LEFT, padx=5)
+            btn_ganancias = tk.Button(frame_prod, text="💰", fg="green", command=self.ver_ganancias)
+            btn_ganancias.pack(side=tk.LEFT, padx=5)
+            btn_gestion_usr = tk.Button(frame_prod, text="👤", command=self.abrir_gestion_usuarios)
+            btn_gestion_usr.pack(side=tk.LEFT, padx=5)
 
         # Display Stock
         self.label_stock = tk.Label(self.root, text="Stock Actual: ...", font=("Arial", 16), fg="#333")
@@ -59,6 +67,9 @@ class MainWindow:
         btn_vender = tk.Button(frame_botones, text="Venta Realizada (-)", bg="#f8d7da", font=("Arial", 10), command=self.vender)
         btn_vender.pack(side=tk.LEFT, padx=15)
 
+        btn_logout = tk.Button(self.root, text="Cerrar Sesión", command=self.on_logout)
+        btn_logout.pack(side=tk.BOTTOM, pady=10)
+
     def actualizar_lista_productos(self):
         productos = self.logic.obtener_productos()
         self.combo_productos['values'] = productos
@@ -74,16 +85,42 @@ class MainWindow:
         self.combo_productos.current(len(self.combo_productos['values']) - 1) # Seleccionar el nuevo
         self.actualizar_display()
 
+    def eliminar_producto(self):
+        producto = self.combo_productos.get()
+        if not producto:
+            return
+        
+        confirmar = messagebox.askyesno("Confirmar Baja", f"¿Estás seguro de dar de baja '{producto}'?\nEl historial de ventas se conservará.")
+        if confirmar:
+            exito, mensaje = self.logic.dar_baja_producto(producto)
+            if exito:
+                messagebox.showinfo("Baja Exitosa", mensaje)
+                self.actualizar_lista_productos()
+                self.actualizar_display()
+            else:
+                messagebox.showerror("Error", mensaje)
+
+    def abrir_gestion_usuarios(self):
+        GestionUsuariosDialog(self.root, self.logic)
+
+    def ver_ganancias(self):
+        total = self.logic.obtener_reporte_ganancias()
+        messagebox.showinfo("Reporte Financiero", f"Total Ingresos por Ventas: ${total:.2f}")
+
     def actualizar_display(self):
         producto = self.combo_productos.get()
         if producto:
-            cantidad = self.logic.obtener_stock_actual(producto)
+            datos = self.logic.obtener_datos_producto(producto)
             
-            # Alerta de stock bajo (menos de 50 unidades)
-            if cantidad < 50:
-                self.label_stock.config(text=f"Stock Actual ({producto}): {cantidad} unidades ⚠️", fg="red")
-            else:
-                self.label_stock.config(text=f"Stock Actual ({producto}): {cantidad} unidades", fg="#333")
+            if datos:
+                cantidad = datos['cantidad']
+                minimo = datos['stock_minimo']
+                
+                # Alerta de stock bajo dinámica (Punto de Reorden)
+                if cantidad <= minimo:
+                    self.label_stock.config(text=f"Stock: {cantidad} (Mín: {minimo}) ⚠️\nPrecio: ${datos['precio_venta']:.2f}", fg="red")
+                else:
+                    self.label_stock.config(text=f"Stock: {cantidad} | Precio: ${datos['precio_venta']:.2f}", fg="#333")
         else:
             self.label_stock.config(text="Stock Actual: -", fg="#333")
 
