@@ -1,6 +1,7 @@
 import os
 import shutil
 import bcrypt
+import logging
 from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, ForeignKey, Float
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -12,6 +13,7 @@ DATA_DIR = os.path.join(USER_DIR, "data")
 BACKUP_DIR = os.path.join(USER_DIR, "backups")
 PDF_DIR = os.path.join(USER_DIR, "pdf")
 CSV_DIR = os.path.join(USER_DIR, "csv")
+LOG_FILE = os.path.join(USER_DIR, "error.log")
 
 for d in [USER_DIR, DATA_DIR, BACKUP_DIR, PDF_DIR, CSV_DIR]:
     if not os.path.exists(d):
@@ -96,6 +98,15 @@ class AuditLog(Base):
     usuario = Column(String, nullable=False)
     accion = Column(String, nullable=False)
     detalles = Column(String, nullable=True)
+
+def setup_logging():
+    """Configura el sistema de logging para guardar errores en archivo."""
+    logging.basicConfig(
+        filename=LOG_FILE,
+        level=logging.ERROR,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
 
 def init_db():
     """Inicializa la base de datos y crea las tablas."""

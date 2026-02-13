@@ -1,5 +1,7 @@
 import tkinter as tk
-from src.database.connection import init_db, backup_db
+import logging
+from tkinter import messagebox
+from src.database.connection import init_db, backup_db, setup_logging
 from src.ui.login_dialog import LoginDialog
 from src.ui.main_window import MainWindow
 
@@ -29,12 +31,20 @@ class AppController:
         self.root.destroy()
 
 def main():
-    init_db()
-    root = tk.Tk()
-    root.title("Sistema de Inventario")
-    root.geometry("900x500") # Un poco más ancho para los nuevos botones
-    app = AppController(root) # Asignar a variable para mantener la referencia
-    root.mainloop()
+    setup_logging()
+    try:
+        init_db()
+        root = tk.Tk()
+        root.title("Sistema de Inventario")
+        root.geometry("900x500") # Un poco más ancho para los nuevos botones
+        app = AppController(root) # Asignar a variable para mantener la referencia
+        root.mainloop()
+    except Exception as e:
+        logging.critical("Error fatal no controlado en la aplicación:", exc_info=True)
+        try:
+            messagebox.showerror("Error Fatal", f"Se ha producido un error inesperado.\nRevise el log de errores en Documentos/Cajonera.\n\n{str(e)}")
+        except:
+            pass # Si falla la GUI, al menos queda el log
 
 if __name__ == "__main__":
     main()

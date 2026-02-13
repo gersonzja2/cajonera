@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 
 class GestionUsuariosDialog:
     def __init__(self, parent, logic):
@@ -17,6 +17,9 @@ class GestionUsuariosDialog:
         
         btn_eliminar = tk.Button(frame_lista, text="Eliminar Seleccionado 🗑️", fg="red", command=self.eliminar_usuario)
         btn_eliminar.pack(side=tk.BOTTOM, pady=5)
+
+        btn_password = tk.Button(frame_lista, text="Cambiar Contraseña 🔑", fg="blue", command=self.cambiar_password)
+        btn_password.pack(side=tk.BOTTOM, pady=5)
 
         self.tree = ttk.Treeview(frame_lista, columns=("Usuario", "Rol"), show="headings", height=8)
         self.tree.heading("Usuario", text="Usuario")
@@ -92,5 +95,21 @@ class GestionUsuariosDialog:
             if exito:
                 messagebox.showinfo("Éxito", msg)
                 self.cargar_usuarios()
+            else:
+                messagebox.showerror("Error", msg)
+
+    def cambiar_password(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Atención", "Seleccione un usuario para cambiar su contraseña.")
+            return
+        
+        username = self.tree.item(selected[0])['values'][0]
+        new_pass = simpledialog.askstring("Cambiar Contraseña", f"Ingrese nueva contraseña para '{username}':", parent=self.window, show='*')
+        
+        if new_pass:
+            exito, msg = self.logic.cambiar_password_usuario(username, new_pass)
+            if exito:
+                messagebox.showinfo("Éxito", msg)
             else:
                 messagebox.showerror("Error", msg)

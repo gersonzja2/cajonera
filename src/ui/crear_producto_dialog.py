@@ -9,7 +9,7 @@ class CrearProductoDialog:
         self.window = tk.Toplevel(parent)
         self.window.title("Nuevo Producto")
         self.window.geometry("300x400")
-        self.window.transient(parent)
+        self.window.transient(parent.winfo_toplevel())
         self.window.grab_set()
         
         tk.Label(self.window, text="Nombre del Producto:").pack(pady=5)

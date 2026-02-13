@@ -3,6 +3,7 @@ import os
 import bcrypt
 import re
 import csv
+import logging
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -61,6 +62,7 @@ class InventarioLogic:
             session.commit()
             return True, f"Producto '{nombre}' creado."
         except Exception as e:
+            logging.error("Error en crear_producto", exc_info=True)
             return False, str(e)
         finally:
             session.close()
@@ -81,6 +83,7 @@ class InventarioLogic:
                 return True, f"Precio actualizado a ${nuevo_precio}."
             return False, "Producto no encontrado."
         except Exception as e:
+            logging.error("Error en actualizar_precio_producto", exc_info=True)
             return False, str(e)
         finally:
             session.close()
@@ -137,6 +140,7 @@ class InventarioLogic:
             return False, "Producto no encontrado en la base de datos."
         except Exception as e:
             session.rollback()
+            logging.error("Error en agregar_stock", exc_info=True)
             return False, f"Error de base de datos: {str(e)}"
         finally:
             session.close()
@@ -191,6 +195,7 @@ class InventarioLogic:
             return False, "Producto no encontrado."
         except Exception as e:
             session.rollback()
+            logging.error("Error en vender_stock", exc_info=True)
             return False, f"Error de base de datos: {str(e)}"
         finally:
             session.close()
@@ -255,6 +260,7 @@ class InventarioLogic:
 
         except Exception as e:
             session.rollback()
+            logging.error("Error en confirmar_venta_carrito", exc_info=True)
             return False, f"Error al procesar venta: {str(e)}"
         finally:
             session.close()
@@ -287,6 +293,7 @@ class InventarioLogic:
             return True, "Stock actualizado correctamente."
         except Exception as e:
             session.rollback()
+            logging.error("Error en confirmar_recepcion", exc_info=True)
             return False, str(e)
         finally:
             session.close()
@@ -306,6 +313,7 @@ class InventarioLogic:
                 return True, f"Producto '{nombre_producto}' dado de baja correctamente."
             return False, "Producto no encontrado."
         except Exception as e:
+            logging.error("Error en dar_baja_producto", exc_info=True)
             return False, str(e)
         finally:
             session.close()
@@ -332,6 +340,7 @@ class InventarioLogic:
             return True, f"Usuario '{username}' creado con éxito."
         except Exception as e:
             session.rollback()
+            logging.error("Error en crear_usuario", exc_info=True)
             return False, str(e)
         finally:
             session.close()
@@ -356,6 +365,31 @@ class InventarioLogic:
             return True, f"Usuario '{username_a_eliminar}' eliminado correctamente."
         except Exception as e:
             session.rollback()
+            logging.error("Error en eliminar_usuario", exc_info=True)
+            return False, str(e)
+        finally:
+            session.close()
+
+    def cambiar_password_usuario(self, username, new_password):
+        """Cambia la contraseña de un usuario existente."""
+        if self.current_role != 'admin':
+            return False, "Permiso denegado: Solo administradores."
+
+        session = SessionLocal()
+        try:
+            user = session.query(Usuario).filter_by(username=username).first()
+            if not user:
+                return False, "Usuario no encontrado."
+            
+            hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+            user.password_hash = hashed.decode('utf-8')
+            
+            self._registrar_auditoria(session, "CAMBIAR_PASSWORD", f"Usuario: {username}")
+            session.commit()
+            return True, f"Contraseña de '{username}' actualizada correctamente."
+        except Exception as e:
+            session.rollback()
+            logging.error("Error en cambiar_password_usuario", exc_info=True)
             return False, str(e)
         finally:
             session.close()
@@ -380,6 +414,7 @@ class InventarioLogic:
             session.commit()
             return True, "Cliente registrado correctamente."
         except Exception as e:
+            logging.error("Error en crear_cliente", exc_info=True)
             return False, str(e)
         finally:
             session.close()
@@ -398,6 +433,7 @@ class InventarioLogic:
             session.commit()
             return True, "Proveedor registrado correctamente."
         except Exception as e:
+            logging.error("Error en crear_proveedor", exc_info=True)
             return False, str(e)
         finally:
             session.close()
@@ -464,6 +500,7 @@ class InventarioLogic:
             # Nota: No guardamos log en DB para generación de PDF, pero podríamos.
             return True, f"Orden generada en:\n{filename}"
         except Exception as e:
+            logging.error("Error en generar_orden_compra_pdf", exc_info=True)
             return False, str(e)
         finally:
             session.close()
@@ -536,6 +573,7 @@ class InventarioLogic:
             return True, "Devolución procesada correctamente. Stock restaurado y caja ajustada."
         except Exception as e:
             session.rollback()
+            logging.error("Error en realizar_devolucion", exc_info=True)
             return False, str(e)
         finally:
             session.close()
@@ -566,6 +604,7 @@ class InventarioLogic:
             c.save()
             return True, f"PDF de prueba generado en:\n{filename}"
         except Exception as e:
+            logging.error("Error en generar_pdf_prueba", exc_info=True)
             return False, str(e)
 
     def exportar_ventas_csv(self):
@@ -590,6 +629,7 @@ class InventarioLogic:
             
             return True, f"Reporte CSV generado en:\n{filename}"
         except Exception as e:
+            logging.error("Error en exportar_ventas_csv", exc_info=True)
             return False, str(e)
         finally:
             session.close()

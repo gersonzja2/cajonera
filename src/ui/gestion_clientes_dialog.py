@@ -9,7 +9,7 @@ class GestionClientesDialog:
         self.window = tk.Toplevel(parent)
         self.window.title("Gestión de Clientes")
         self.window.geometry("300x250")
-        self.window.transient(parent)
+        self.window.transient(parent.winfo_toplevel())
         self.window.grab_set()
         
         tk.Label(self.window, text="Nombre Cliente:").pack(pady=5)

@@ -8,6 +8,7 @@ from src.ui.gestion_proveedores_dialog import GestionProveedoresDialog
 from src.ui.configuracion_dialog import ConfiguracionDialog
 from src.ui.devoluciones_dialog import DevolucionesDialog
 from src.ui.recepcion_dialog import RecepcionDialog
+from src.ui.reporte_financiero_dialog import ReporteFinancieroDialog
 
 class MainWindow:
     def __init__(self, root, usuario, on_logout):
@@ -239,13 +240,7 @@ class MainWindow:
         self.seleccionar_proveedor_orden(proveedores)
 
     def ver_ganancias(self):
-        ventas, costos, ganancia = self.logic.obtener_reporte_financiero()
-        msg = f"--- Reporte Financiero ---\n\n" \
-              f"Ingresos Totales:   ${ventas:.2f}\n" \
-              f"Costo Mercadería:  -${costos:.2f}\n" \
-              f"--------------------------\n" \
-              f"Ganancia Neta:      ${ganancia:.2f}"
-        messagebox.showinfo("Reporte Financiero", msg)
+        ReporteFinancieroDialog(self.root, self.logic)
 
     def actualizar_display(self):
         producto = self.combo_productos.get()
