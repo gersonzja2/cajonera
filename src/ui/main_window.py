@@ -79,6 +79,8 @@ class MainWindow:
             btn_config.pack(side=tk.LEFT, padx=5)
             btn_devolucion = tk.Button(frame_prod, text="↩️", command=self.abrir_devoluciones)
             btn_devolucion.pack(side=tk.LEFT, padx=5)
+            btn_pruebas = tk.Button(frame_prod, text="🧪", command=self.abrir_pruebas)
+            btn_pruebas.pack(side=tk.LEFT, padx=5)
 
         # Display Stock
         self.label_stock = tk.Label(self.root, text="Stock Actual: ...", font=("Arial", 16), fg="#333")
@@ -199,6 +201,26 @@ class MainWindow:
 
     def abrir_devoluciones(self):
         DevolucionesDialog(self.root, self.logic, self.usuario.username, self.actualizar_display)
+
+    def abrir_pruebas(self):
+        top = tk.Toplevel(self.root)
+        top.title("Pruebas y Exportación")
+        top.geometry("300x150")
+        
+        tk.Label(top, text="Generar Archivos", font=("Arial", 12, "bold")).pack(pady=10)
+        
+        def do_pdf():
+            exito, msg = self.logic.generar_pdf_prueba()
+            if exito: messagebox.showinfo("PDF Generado", msg)
+            else: messagebox.showerror("Error", msg)
+            
+        def do_csv():
+            exito, msg = self.logic.exportar_ventas_csv()
+            if exito: messagebox.showinfo("CSV Exportado", msg)
+            else: messagebox.showerror("Error", msg)
+
+        tk.Button(top, text="📄 Generar PDF de Prueba", command=do_pdf).pack(pady=5)
+        tk.Button(top, text="📊 Exportar Ventas a CSV (Excel)", command=do_csv).pack(pady=5)
 
     def abrir_recepcion(self):
         RecepcionDialog(self.root, self.logic, self.usuario.username, self.actualizar_display)

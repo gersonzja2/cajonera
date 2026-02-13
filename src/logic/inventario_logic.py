@@ -2,10 +2,11 @@ import json
 import os
 import bcrypt
 import re
+import csv
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-from src.database.connection import SessionLocal, Producto, Movimiento, Usuario, Venta, Cliente, Proveedor, AuditLog, USER_DIR, PDF_DIR
+from src.database.connection import SessionLocal, Producto, Movimiento, Usuario, Venta, Cliente, Proveedor, AuditLog, USER_DIR, PDF_DIR, CSV_DIR
 
 class InventarioLogic:
     def __init__(self):
@@ -548,6 +549,48 @@ class InventarioLogic:
             total_ganancia = sum(v.ganancia for v in ventas)
             total_costos = total_ventas - total_ganancia
             return total_ventas, total_costos, total_ganancia
+        finally:
+            session.close()
+
+    def generar_pdf_prueba(self):
+        """Genera un PDF simple para probar la librería ReportLab."""
+        filename = os.path.join(PDF_DIR, f"Test_PDF_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
+        try:
+            c = canvas.Canvas(filename, pagesize=letter)
+            c.setFont("Helvetica-Bold", 20)
+            c.drawString(100, 750, "Prueba de Generación de PDF")
+            c.setFont("Helvetica", 12)
+            c.drawString(100, 720, f"Generado por usuario: {self.current_user}")
+            c.drawString(100, 700, f"Fecha y Hora: {datetime.now()}")
+            c.drawString(100, 680, "Si puedes leer esto, el sistema de reportes funciona correctamente.")
+            c.save()
+            return True, f"PDF de prueba generado en:\n{filename}"
+        except Exception as e:
+            return False, str(e)
+
+    def exportar_ventas_csv(self):
+        """Exporta el historial completo de ventas a un archivo CSV (Excel)."""
+        if self.current_role != 'admin':
+            return False, "Permiso denegado: Solo administradores."
+
+        filename = os.path.join(CSV_DIR, f"Reporte_Ventas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+        
+        session = SessionLocal()
+        try:
+            # Obtenemos ventas con el nombre del producto
+            ventas = session.query(Venta, Producto.nombre).join(Producto, Venta.producto_id == Producto.id).all()
+            
+            with open(filename, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                # Encabezados
+                writer.writerow(["ID Venta", "Fecha", "Producto", "Cantidad", "Total ($)", "Ganancia ($)", "Usuario", "Reembolsado"])
+                
+                for v, prod_nombre in ventas:
+                    writer.writerow([v.id, v.fecha_hora, prod_nombre, v.cantidad, v.total, v.ganancia, v.usuario_id, "Sí" if v.reembolsado else "No"])
+            
+            return True, f"Reporte CSV generado en:\n{filename}"
+        except Exception as e:
+            return False, str(e)
         finally:
             session.close()
 

@@ -11,8 +11,9 @@ USER_DIR = os.path.join(os.path.expanduser("~"), "Documents", "Cajonera")
 DATA_DIR = os.path.join(USER_DIR, "data")
 BACKUP_DIR = os.path.join(USER_DIR, "backups")
 PDF_DIR = os.path.join(USER_DIR, "pdf")
+CSV_DIR = os.path.join(USER_DIR, "csv")
 
-for d in [USER_DIR, DATA_DIR, BACKUP_DIR, PDF_DIR]:
+for d in [USER_DIR, DATA_DIR, BACKUP_DIR, PDF_DIR, CSV_DIR]:
     if not os.path.exists(d):
         os.makedirs(d)
 
