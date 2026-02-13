@@ -58,6 +58,7 @@ class Venta(Base):
     total = Column(Float, nullable=False) # Precio Venta * Cantidad
     ganancia = Column(Float, default=0.0) # (Precio Venta - Precio Costo) * Cantidad
     usuario_id = Column(String, default="admin")
+    reembolsado = Column(Boolean, default=False) # Para marcar si ya fue devuelta
 
 class Proveedor(Base):
     __tablename__ = 'proveedores'

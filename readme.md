@@ -1,4 +1,4 @@
-# Sistema de Inventario y POS (Cajonera)
+# Sistema de Inventario y POS 
 
 Sistema de gestión de inventario y punto de venta (POS) desarrollado en Python. Diseñado para administrar stock, ventas, clientes y proveedores de manera eficiente utilizando una arquitectura **MVC (Modelo-Vista-Controlador)**.
 

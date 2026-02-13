@@ -6,6 +6,7 @@ from src.ui.gestion_usuarios_dialog import GestionUsuariosDialog
 from src.ui.gestion_clientes_dialog import GestionClientesDialog
 from src.ui.gestion_proveedores_dialog import GestionProveedoresDialog
 from src.ui.configuracion_dialog import ConfiguracionDialog
+from src.ui.devoluciones_dialog import DevolucionesDialog
 
 class MainWindow:
     def __init__(self, root, usuario, on_logout):
@@ -54,6 +55,8 @@ class MainWindow:
             btn_orden.pack(side=tk.LEFT, padx=5)
             btn_config = tk.Button(frame_prod, text="⚙️", command=self.abrir_configuracion)
             btn_config.pack(side=tk.LEFT, padx=5)
+            btn_devolucion = tk.Button(frame_prod, text="↩️", command=self.abrir_devoluciones)
+            btn_devolucion.pack(side=tk.LEFT, padx=5)
 
         # Display Stock
         self.label_stock = tk.Label(self.root, text="Stock Actual: ...", font=("Arial", 16), fg="#333")
@@ -172,6 +175,9 @@ class MainWindow:
 
     def abrir_configuracion(self):
         ConfiguracionDialog(self.root)
+
+    def abrir_devoluciones(self):
+        DevolucionesDialog(self.root, self.logic, self.usuario.username, self.actualizar_display)
 
     def generar_orden_compra(self):
         # 1. Obtener proveedores para que el usuario elija

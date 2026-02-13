@@ -1,4 +1,7 @@
+import json
+import os
 import bcrypt
+import re
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -6,7 +9,7 @@ from src.database.connection import SessionLocal, Producto, Movimiento, Usuario,
 
 class InventarioLogic:
     def __init__(self):
-        pass
+        self.CONFIG_FILE = "config.json"
 
     def obtener_productos(self):
         """Devuelve una lista con los nombres de todos los productos."""
@@ -153,12 +156,14 @@ class InventarioLogic:
         session = SessionLocal()
         try:
             # 1. Validar stock para todos los items antes de procesar nada
+            # Es mejor hacer esto en un bucle separado para no dejar la sesión en estado sucio si algo falla
             cliente_id = None
             if nombre_cliente:
                 cliente = session.query(Cliente).filter_by(nombre=nombre_cliente).first()
                 if cliente:
                     cliente_id = cliente.id
 
+            # Bucle de Validación
             for item in items_carrito:
                 prod_nombre = item['producto']
                 cantidad = item['cantidad']
@@ -169,7 +174,12 @@ class InventarioLogic:
                 if producto.cantidad < cantidad:
                     return False, f"Stock insuficiente para '{prod_nombre}'. Stock: {producto.cantidad}, Solicitado: {cantidad}"
 
-                # 2. Si hay stock, preparamos la operación (dentro de la misma transacción)
+            # 2. Si todo es válido, ejecutamos la operación
+            for item in items_carrito:
+                prod_nombre = item['producto']
+                cantidad = item['cantidad']
+                producto = session.query(Producto).filter_by(nombre=prod_nombre, activo=True).first()
+
                 producto.cantidad -= cantidad
 
                 total_venta = producto.precio_venta * cantidad
@@ -296,12 +306,19 @@ class InventarioLogic:
             if not productos_bajo_stock:
                 return False, "No hay productos con stock bajo para pedir."
 
-            filename = f"Orden_Compra_{nombre_proveedor}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            # Sanitizar nombre de archivo
+            nombre_safe = re.sub(r'[^\w\s-]', '', nombre_proveedor).strip().replace(' ', '_')
+            filename = f"Orden_Compra_{nombre_safe}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            
+            # Obtener nombre de la empresa desde config
+            config = self.obtener_configuracion()
+            empresa = config.get("nombre_empresa", "Mi Empresa")
+
             c = canvas.Canvas(filename, pagesize=letter)
             
             # Encabezado
             c.setFont("Helvetica-Bold", 16)
-            c.drawString(50, 750, f"ORDEN DE COMPRA")
+            c.drawString(50, 750, f"ORDEN DE COMPRA - {empresa}")
             c.setFont("Helvetica", 12)
             c.drawString(50, 730, f"Proveedor: {nombre_proveedor}")
             c.drawString(50, 715, f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
@@ -331,6 +348,74 @@ class InventarioLogic:
             c.save()
             return True, f"Orden generada: {filename}"
         except Exception as e:
+            return False, str(e)
+        finally:
+            session.close()
+
+    def obtener_historial_ventas(self):
+        """Obtiene las ventas recientes para mostrarlas en la tabla de devoluciones."""
+        session = SessionLocal()
+        try:
+            # Unimos Venta con Producto para obtener el nombre
+            resultados = session.query(Venta, Producto.nombre).join(Producto, Venta.producto_id == Producto.id).order_by(Venta.fecha_hora.desc()).limit(50).all()
+            
+            ventas_data = []
+            for venta, nombre_prod in resultados:
+                ventas_data.append({
+                    "id": venta.id,
+                    "fecha": venta.fecha_hora.strftime("%d/%m/%Y %H:%M"),
+                    "producto": nombre_prod,
+                    "cantidad": venta.cantidad,
+                    "total": venta.total,
+                    "reembolsado": venta.reembolsado
+                })
+            return ventas_data
+        finally:
+            session.close()
+
+    def realizar_devolucion(self, venta_id, usuario_id):
+        """Procesa la devolución: restaura stock y crea contra-asiento financiero."""
+        session = SessionLocal()
+        try:
+            venta_original = session.query(Venta).get(venta_id)
+            if not venta_original:
+                return False, "Venta no encontrada."
+            if venta_original.reembolsado:
+                return False, "Esta venta ya ha sido reembolsada."
+            
+            # 1. Marcar original como reembolsada
+            venta_original.reembolsado = True
+            
+            # 2. Crear registro negativo en Ventas (Contra-asiento)
+            # Esto ajustará automáticamente el reporte financiero (Ingresos - Devoluciones)
+            contra_venta = Venta(
+                producto_id=venta_original.producto_id,
+                cliente_id=venta_original.cliente_id,
+                cantidad=-venta_original.cantidad, # Cantidad negativa
+                total=-venta_original.total,       # Total negativo (resta de la caja)
+                ganancia=-venta_original.ganancia, # Resta de la ganancia
+                usuario_id=usuario_id,
+                reembolsado=True # Marcamos como true para que no se pueda "devolver la devolución"
+            )
+            session.add(contra_venta)
+
+            # 3. Restaurar Stock
+            producto = session.query(Producto).get(venta_original.producto_id)
+            producto.cantidad += venta_original.cantidad
+
+            # 4. Registrar Movimiento de Stock
+            movimiento = Movimiento(
+                producto_id=venta_original.producto_id,
+                tipo_movimiento="devolucion",
+                cantidad=venta_original.cantidad,
+                usuario_id=usuario_id
+            )
+            session.add(movimiento)
+
+            session.commit()
+            return True, "Devolución procesada correctamente. Stock restaurado y caja ajustada."
+        except Exception as e:
+            session.rollback()
             return False, str(e)
         finally:
             session.close()
@@ -366,3 +451,19 @@ class InventarioLogic:
             return None
         finally:
             session.close()
+
+    def obtener_configuracion(self):
+        """Lee la configuración desde un archivo JSON."""
+        if not os.path.exists(self.CONFIG_FILE):
+            return {"nombre_empresa": "Mi Empresa de Cartón"}
+        try:
+            with open(self.CONFIG_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return {"nombre_empresa": "Mi Empresa de Cartón"}
+
+    def guardar_configuracion(self, datos):
+        """Guarda la configuración en un archivo JSON."""
+        with open(self.CONFIG_FILE, "w") as f:
+            json.dump(datos, f, indent=4)
+        return True, "Configuración guardada correctamente."
